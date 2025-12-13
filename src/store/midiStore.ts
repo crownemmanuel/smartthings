@@ -2,8 +2,16 @@ import { create } from 'zustand';
 import type { MIDIMapping, MIDIActionType } from '@/types';
 
 const MIDI_DEVICE_KEY = 'stage-control-midi-device';
+const MIDI_OUTPUT_KEY = 'stage-control-midi-output';
+const MIDI_LOOPBACK_KEY = 'stage-control-midi-loopback';
 
 interface MIDIInput {
+  id: string;
+  name: string;
+  manufacturer: string;
+}
+
+interface MIDIOutput {
   id: string;
   name: string;
   manufacturer: string;
@@ -25,6 +33,34 @@ function getSavedDevice(): string | null {
   return localStorage.getItem(MIDI_DEVICE_KEY);
 }
 
+// Save selected MIDI output to localStorage
+function saveSelectedOutput(outputId: string | null): void {
+  if (typeof window === 'undefined') return;
+  if (outputId) {
+    localStorage.setItem(MIDI_OUTPUT_KEY, outputId);
+  } else {
+    localStorage.removeItem(MIDI_OUTPUT_KEY);
+  }
+}
+
+// Get saved MIDI output from localStorage
+function getSavedOutput(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(MIDI_OUTPUT_KEY);
+}
+
+// Save loopback enabled state
+function saveLoopbackEnabled(enabled: boolean): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(MIDI_LOOPBACK_KEY, enabled ? 'true' : 'false');
+}
+
+// Get loopback enabled state
+function getLoopbackEnabled(): boolean {
+  if (typeof window === 'undefined') return false;
+  return localStorage.getItem(MIDI_LOOPBACK_KEY) === 'true';
+}
+
 interface MIDIStoreState {
   // Connection state
   isSupported: boolean;
@@ -34,6 +70,11 @@ interface MIDIStoreState {
   // Available inputs
   availableInputs: MIDIInput[];
   selectedInputId: string | null;
+  
+  // Available outputs (for loopback)
+  availableOutputs: MIDIOutput[];
+  selectedOutputId: string | null;
+  loopbackEnabled: boolean;
   
   // Learning mode
   isLearning: boolean;
@@ -49,6 +90,8 @@ interface MIDIStoreState {
   initialize: () => Promise<void>;
   selectInput: (inputId: string) => void;
   disconnect: () => void;
+  selectOutput: (outputId: string | null) => void;
+  setLoopbackEnabled: (enabled: boolean) => void;
   
   // Learning mode
   startLearning: (callback: (note: number, channel: number) => void) => void;
@@ -67,6 +110,9 @@ export const useMIDIStore = create<MIDIStoreState>((set, get) => ({
   midiAccess: null,
   availableInputs: [],
   selectedInputId: null,
+  availableOutputs: [],
+  selectedOutputId: null,
+  loopbackEnabled: getLoopbackEnabled(),
   isLearning: false,
   learningCallback: null,
   lastNote: null,
@@ -91,17 +137,33 @@ export const useMIDIStore = create<MIDIStoreState>((set, get) => ({
         });
       });
       
+      const outputs: MIDIOutput[] = [];
+      midiAccess.outputs.forEach((output) => {
+        outputs.push({
+          id: output.id,
+          name: output.name || 'Unknown Output',
+          manufacturer: output.manufacturer || 'Unknown',
+        });
+      });
+      
       set({ 
         midiAccess, 
         availableInputs: inputs,
+        availableOutputs: outputs,
         isConnected: true,
         error: null 
       });
       
-      // Try to reconnect to last used device
+      // Try to reconnect to last used input device
       const savedDeviceId = getSavedDevice();
       if (savedDeviceId && inputs.some(i => i.id === savedDeviceId)) {
         get().selectInput(savedDeviceId);
+      }
+      
+      // Try to reconnect to last used output device
+      const savedOutputId = getSavedOutput();
+      if (savedOutputId && outputs.some(o => o.id === savedOutputId)) {
+        get().selectOutput(savedOutputId);
       }
       
       // Listen for device changes
@@ -114,13 +176,29 @@ export const useMIDIStore = create<MIDIStoreState>((set, get) => ({
             manufacturer: input.manufacturer || 'Unknown',
           });
         });
-        set({ availableInputs: newInputs });
         
-        // Try to reconnect to saved device if it becomes available
-        const { selectedInputId } = get();
-        const saved = getSavedDevice();
-        if (!selectedInputId && saved && newInputs.some(i => i.id === saved)) {
-          get().selectInput(saved);
+        const newOutputs: MIDIOutput[] = [];
+        midiAccess.outputs.forEach((output) => {
+          newOutputs.push({
+            id: output.id,
+            name: output.name || 'Unknown Output',
+            manufacturer: output.manufacturer || 'Unknown',
+          });
+        });
+        
+        set({ availableInputs: newInputs, availableOutputs: newOutputs });
+        
+        // Try to reconnect to saved input device if it becomes available
+        const { selectedInputId, selectedOutputId } = get();
+        const savedInput = getSavedDevice();
+        if (!selectedInputId && savedInput && newInputs.some(i => i.id === savedInput)) {
+          get().selectInput(savedInput);
+        }
+        
+        // Try to reconnect to saved output device if it becomes available
+        const savedOutput = getSavedOutput();
+        if (!selectedOutputId && savedOutput && newOutputs.some(o => o.id === savedOutput)) {
+          get().selectOutput(savedOutput);
         }
       };
       
@@ -164,6 +242,16 @@ export const useMIDIStore = create<MIDIStoreState>((set, get) => ({
           noteEventCounter++;
           set({ lastNote: { note, channel, velocity, eventId: noteEventCounter } });
           
+          // Forward to output if loopback is enabled
+          const { loopbackEnabled, selectedOutputId, midiAccess: access } = get();
+          if (loopbackEnabled && selectedOutputId && access) {
+            const output = access.outputs.get(selectedOutputId);
+            if (output) {
+              // Forward the original MIDI message
+              output.send(event.data);
+            }
+          }
+          
           // If in learning mode, call the callback
           const { isLearning, learningCallback } = get();
           if (isLearning && learningCallback) {
@@ -175,6 +263,17 @@ export const useMIDIStore = create<MIDIStoreState>((set, get) => ({
           const { onNoteOn } = get();
           if (onNoteOn) {
             onNoteOn(note, channel, velocity);
+          }
+        }
+        
+        // Also forward Note Off messages if loopback is enabled
+        if ((status >= 128 && status <= 143) || (status >= 144 && status <= 159 && velocity === 0)) {
+          const { loopbackEnabled, selectedOutputId, midiAccess: access } = get();
+          if (loopbackEnabled && selectedOutputId && access) {
+            const output = access.outputs.get(selectedOutputId);
+            if (output) {
+              output.send(event.data);
+            }
           }
         }
       };
@@ -196,6 +295,16 @@ export const useMIDIStore = create<MIDIStoreState>((set, get) => ({
     
     set({ selectedInputId: null });
     saveSelectedDevice(null);
+  },
+  
+  selectOutput: (outputId) => {
+    set({ selectedOutputId: outputId });
+    saveSelectedOutput(outputId);
+  },
+  
+  setLoopbackEnabled: (enabled) => {
+    set({ loopbackEnabled: enabled });
+    saveLoopbackEnabled(enabled);
   },
   
   startLearning: (callback) => {

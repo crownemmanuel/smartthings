@@ -22,11 +22,16 @@ export default function MIDISettings({ onClose, onAddMapping, onUpdateMapping, o
     isConnected, 
     availableInputs, 
     selectedInputId, 
+    availableOutputs,
+    selectedOutputId,
+    loopbackEnabled,
     lastNote,
     error,
     initialize, 
     selectInput, 
-    disconnect 
+    disconnect,
+    selectOutput,
+    setLoopbackEnabled
   } = useMIDIStore();
   
   const { currentShow } = useShowStore();
@@ -121,6 +126,63 @@ export default function MIDISettings({ onClose, onAddMapping, onUpdateMapping, o
                   )}
                 </div>
               )}
+              
+              {/* MIDI Loopback / Passthrough */}
+              <div className="p-4 bg-zinc-800/50 border border-zinc-700 rounded-lg">
+                <div className="flex items-center justify-between mb-3">
+                  <div>
+                    <h3 className="text-sm font-medium text-white">MIDI Loopback</h3>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      Forward incoming MIDI to a virtual output (e.g., loopMIDI)
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setLoopbackEnabled(!loopbackEnabled)}
+                    className={`relative w-12 h-6 rounded-full transition-colors ${
+                      loopbackEnabled ? 'bg-amber-600' : 'bg-zinc-600'
+                    }`}
+                  >
+                    <div
+                      className={`absolute top-0.5 w-5 h-5 bg-white rounded-full transition-transform ${
+                        loopbackEnabled ? 'translate-x-6' : 'translate-x-0.5'
+                      }`}
+                    />
+                  </button>
+                </div>
+                
+                {loopbackEnabled && (
+                  <div className="mt-3">
+                    <label className="block text-xs text-zinc-400 mb-2">Output Device</label>
+                    <select
+                      value={selectedOutputId || ''}
+                      onChange={(e) => selectOutput(e.target.value || null)}
+                      className="w-full px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent outline-none"
+                    >
+                      <option value="">Select output device...</option>
+                      {availableOutputs.map((output) => (
+                        <option key={output.id} value={output.id}>
+                          {output.name} {output.manufacturer ? `(${output.manufacturer})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                    
+                    {availableOutputs.length === 0 && (
+                      <p className="text-xs text-zinc-500 mt-2">
+                        No MIDI outputs found. Install loopMIDI or a virtual MIDI driver.
+                      </p>
+                    )}
+                    
+                    {selectedOutputId && (
+                      <div className="mt-3 flex items-center gap-2 text-xs">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-emerald-400">
+                          Loopback active — MIDI signals will be forwarded
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
               
               {/* MIDI Mappings */}
               {currentShow && (
