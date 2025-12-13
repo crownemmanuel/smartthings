@@ -6,10 +6,11 @@ import type { MIDIMapping } from '@/types';
 
 interface MIDIMappingListProps {
   mappings: MIDIMapping[];
+  onEdit: (mapping: MIDIMapping) => void;
   onDelete: (mappingId: string) => void;
 }
 
-export default function MIDIMappingList({ mappings, onDelete }: MIDIMappingListProps) {
+export default function MIDIMappingList({ mappings, onEdit, onDelete }: MIDIMappingListProps) {
   const { currentShow } = useShowStore();
   
   const getTargetName = (mapping: MIDIMapping): string => {
@@ -79,6 +80,17 @@ export default function MIDIMappingList({ mappings, onDelete }: MIDIMappingListP
                 )}
               </div>
             </div>
+            
+            {/* Edit button */}
+            <button
+              onClick={() => onEdit(mapping)}
+              className="p-1.5 text-zinc-400 hover:text-amber-400 hover:bg-zinc-700 rounded transition-colors"
+              title="Edit Mapping"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+            </button>
             
             {/* Delete button */}
             <button

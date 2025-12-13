@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { SequenceWithSteps, TPLinkDevice } from '@/types';
+import { useShowStore } from '@/store/showStore';
+import { useMIDIStore, midiNoteToName } from '@/store/midiStore';
+import type { SequenceWithSteps, TPLinkDevice, MIDIMapping } from '@/types';
 
 interface SequenceVisualizerProps {
   sequence: SequenceWithSteps;
@@ -15,6 +17,13 @@ interface DeviceState {
   isOn: boolean;
 }
 
+interface MIDITrigger {
+  note: number;
+  noteName: string;
+  action: string;
+  timestamp: number;
+}
+
 export default function SequenceVisualizer({
   sequence,
   availableDevices,
@@ -26,9 +35,14 @@ export default function SequenceVisualizer({
   const [deviceStates, setDeviceStates] = useState<Map<string, DeviceState>>(new Map());
   const [progress, setProgress] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [midiEnabled, setMidiEnabled] = useState(true);
+  const [lastMidiTrigger, setLastMidiTrigger] = useState<MIDITrigger | null>(null);
   
   const abortControllerRef = useRef<AbortController | null>(null);
   const pauseResolveRef = useRef<(() => void) | null>(null);
+  
+  const { currentShow, getDeviceGroupById, getSequenceById } = useShowStore();
+  const { selectedInputId, lastNote } = useMIDIStore();
   
   // Get all devices used in this sequence
   const usedDevices = useCallback(() => {
@@ -54,12 +68,21 @@ export default function SequenceVisualizer({
     });
   }, [sequence, availableDevices]);
   
-  // Initialize device states
+  // Initialize device states - include ALL devices for MIDI visualization
   useEffect(() => {
-    const devices = usedDevices();
+    const sequenceDevices = usedDevices();
+    const allDeviceIds = new Set(sequenceDevices.map(d => d.deviceId));
+    
+    // Also add all available devices for MIDI triggers
+    for (const device of availableDevices) {
+      if (!allDeviceIds.has(device.deviceId)) {
+        allDeviceIds.add(device.deviceId);
+      }
+    }
+    
     const initialStates = new Map<string, DeviceState>();
     
-    for (const device of devices) {
+    for (const device of sequenceDevices) {
       initialStates.set(device.deviceId, {
         deviceId: device.deviceId,
         deviceName: device.deviceName,
@@ -67,8 +90,150 @@ export default function SequenceVisualizer({
       });
     }
     
+    // Add available devices not in sequence
+    for (const device of availableDevices) {
+      if (!initialStates.has(device.deviceId)) {
+        initialStates.set(device.deviceId, {
+          deviceId: device.deviceId,
+          deviceName: device.alias,
+          isOn: false,
+        });
+      }
+    }
+    
     setDeviceStates(initialStates);
-  }, [usedDevices]);
+  }, [usedDevices, availableDevices]);
+  
+  // Track the eventId when component mounts - ignore any events from before opening
+  const mountEventIdRef = useRef<number>(lastNote?.eventId ?? 0);
+  
+  // Update mount reference when component mounts
+  useEffect(() => {
+    mountEventIdRef.current = lastNote?.eventId ?? 0;
+  }, []); // Only run on mount
+  
+  // Listen for MIDI triggers - only respond to events AFTER component mounted
+  useEffect(() => {
+    if (!midiEnabled || !currentShow || !lastNote) return;
+    
+    // Ignore events that happened before this component opened
+    if (lastNote.eventId <= mountEventIdRef.current) return;
+    
+    // Find mapping for this note
+    const mapping = currentShow.midi_mappings.find(
+      m => m.midi_note === lastNote.note && m.midi_channel === lastNote.channel
+    );
+    
+    if (!mapping) return;
+    
+    // Handle the MIDI action visually
+    handleMIDIAction(mapping, lastNote.note);
+  }, [lastNote?.eventId, midiEnabled, currentShow]);
+  
+  // Handle MIDI action in visualizer
+  const handleMIDIAction = (mapping: MIDIMapping, note: number) => {
+    setLastMidiTrigger({
+      note,
+      noteName: midiNoteToName(note),
+      action: mapping.action_type,
+      timestamp: Date.now(),
+    });
+    
+    // Clear the trigger indicator after a short time
+    setTimeout(() => {
+      setLastMidiTrigger(prev => 
+        prev && prev.timestamp === Date.now() - 1000 ? null : prev
+      );
+    }, 1000);
+    
+    switch (mapping.action_type) {
+      case 'device_group_on':
+        if (mapping.target_id) {
+          const group = getDeviceGroupById(mapping.target_id);
+          if (group) {
+            setDeviceStates(prev => {
+              const newStates = new Map(prev);
+              for (const item of group.items) {
+                const current = newStates.get(item.device_id);
+                if (current) {
+                  newStates.set(item.device_id, { ...current, isOn: true });
+                } else {
+                  newStates.set(item.device_id, {
+                    deviceId: item.device_id,
+                    deviceName: item.device_name,
+                    isOn: true,
+                  });
+                }
+              }
+              return newStates;
+            });
+          }
+        }
+        break;
+        
+      case 'device_group_off':
+        if (mapping.target_id) {
+          const group = getDeviceGroupById(mapping.target_id);
+          if (group) {
+            setDeviceStates(prev => {
+              const newStates = new Map(prev);
+              for (const item of group.items) {
+                const current = newStates.get(item.device_id);
+                if (current) {
+                  newStates.set(item.device_id, { ...current, isOn: false });
+                }
+              }
+              return newStates;
+            });
+          }
+        }
+        break;
+        
+      case 'device_group_toggle':
+        if (mapping.target_id) {
+          const group = getDeviceGroupById(mapping.target_id);
+          if (group) {
+            setDeviceStates(prev => {
+              const newStates = new Map(prev);
+              for (const item of group.items) {
+                const current = newStates.get(item.device_id);
+                if (current) {
+                  newStates.set(item.device_id, { ...current, isOn: !current.isOn });
+                } else {
+                  newStates.set(item.device_id, {
+                    deviceId: item.device_id,
+                    deviceName: item.device_name,
+                    isOn: true,
+                  });
+                }
+              }
+              return newStates;
+            });
+          }
+        }
+        break;
+        
+      case 'blackout':
+        setDeviceStates(prev => {
+          const newStates = new Map(prev);
+          for (const [id, state] of newStates) {
+            newStates.set(id, { ...state, isOn: false });
+          }
+          return newStates;
+        });
+        break;
+        
+      case 'sequence_play':
+        // Could trigger sequence playback in visualizer
+        if (mapping.target_id) {
+          const seq = getSequenceById(mapping.target_id);
+          if (seq && seq.id === sequence.id && !isPlaying) {
+            playSequence();
+          }
+        }
+        break;
+    }
+  };
   
   // Calculate total duration
   const totalDuration = sequence.steps.reduce((acc, step) => acc + step.delay_ms, 0);
@@ -213,42 +378,74 @@ export default function SequenceVisualizer({
               </h2>
               <p className="text-zinc-400 text-sm mt-1">{sequence.name}</p>
             </div>
-            <button
-              onClick={onClose}
-              className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-700 rounded-lg transition-colors"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
+            
+            <div className="flex items-center gap-4">
+              {/* MIDI Status & Toggle */}
+              <div className="flex items-center gap-3 px-4 py-2 bg-zinc-800 rounded-lg">
+                <div className={`w-2 h-2 rounded-full ${selectedInputId ? 'bg-emerald-500' : 'bg-zinc-600'}`} />
+                <span className="text-sm text-zinc-400">MIDI</span>
+                <button
+                  onClick={() => setMidiEnabled(!midiEnabled)}
+                  className={`w-10 h-5 rounded-full transition-colors ${
+                    midiEnabled && selectedInputId ? 'bg-amber-600' : 'bg-zinc-600'
+                  }`}
+                  disabled={!selectedInputId}
+                  title={selectedInputId ? (midiEnabled ? 'Disable MIDI triggers' : 'Enable MIDI triggers') : 'No MIDI device connected'}
+                >
+                  <div
+                    className={`w-4 h-4 bg-white rounded-full transition-transform ${
+                      midiEnabled && selectedInputId ? 'translate-x-5' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+              
+              <button
+                onClick={onClose}
+                className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-700 rounded-lg transition-colors"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
+          
+          {/* MIDI Trigger Indicator */}
+          {lastMidiTrigger && Date.now() - lastMidiTrigger.timestamp < 1000 && (
+            <div className="mt-4 flex items-center gap-3 px-4 py-2 bg-amber-900/30 border border-amber-800 rounded-lg animate-pulse">
+              <svg className="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+              </svg>
+              <span className="text-amber-400 font-mono">{lastMidiTrigger.noteName}</span>
+              <span className="text-zinc-400">→</span>
+              <span className="text-white">{formatActionType(lastMidiTrigger.action)}</span>
+            </div>
+          )}
         </div>
         
         {/* Visualizer Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          {devices.length === 0 ? (
+          {deviceStates.size === 0 ? (
             <div className="text-center py-12">
-              <p className="text-zinc-400">No devices in this sequence</p>
-              <p className="text-zinc-500 text-sm mt-1">Add devices to sequence steps to visualize</p>
+              <p className="text-zinc-400">No devices available</p>
+              <p className="text-zinc-500 text-sm mt-1">Add devices to sequence steps or connect MIDI to visualize</p>
             </div>
           ) : (
             <>
               {/* Light Bulbs Grid */}
               <div className="mb-8">
-                <h3 className="text-sm font-medium text-zinc-400 mb-4 uppercase tracking-wider">Devices</h3>
+                <h3 className="text-sm font-medium text-zinc-400 mb-4 uppercase tracking-wider">
+                  Devices ({deviceStates.size})
+                </h3>
                 <div className="flex flex-wrap gap-6 justify-center">
-                  {devices.map((device) => {
-                    const state = deviceStates.get(device.deviceId);
-                    const isOn = state?.isOn ?? false;
-                    
-                    return (
-                      <LightBulb
-                        key={device.deviceId}
-                        name={device.deviceName}
-                        isOn={isOn}
-                      />
-                    );
-                  })}
+                  {Array.from(deviceStates.values()).map((state) => (
+                    <LightBulb
+                      key={state.deviceId}
+                      name={state.deviceName}
+                      isOn={state.isOn}
+                    />
+                  ))}
                 </div>
               </div>
               
@@ -368,6 +565,7 @@ export default function SequenceVisualizer({
           
           <p className="text-center text-xs text-zinc-500 mt-4">
             Preview mode — no signals sent to real devices
+            {midiEnabled && selectedInputId && ' • MIDI triggers active'}
           </p>
         </div>
       </div>
@@ -449,5 +647,18 @@ function formatTime(ms: number): string {
   const seconds = Math.floor(ms / 1000);
   const milliseconds = Math.floor((ms % 1000) / 10);
   return `${seconds}.${milliseconds.toString().padStart(2, '0')}s`;
+}
+
+// Helper to format action type
+function formatActionType(actionType: string): string {
+  switch (actionType) {
+    case 'device_group_on': return 'Group ON';
+    case 'device_group_off': return 'Group OFF';
+    case 'device_group_toggle': return 'Group Toggle';
+    case 'sequence_play': return 'Play Sequence';
+    case 'scene_activate': return 'Activate Scene';
+    case 'blackout': return 'BLACKOUT';
+    default: return actionType;
+  }
 }
 

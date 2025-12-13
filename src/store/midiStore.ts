@@ -1,10 +1,28 @@
 import { create } from 'zustand';
 import type { MIDIMapping, MIDIActionType } from '@/types';
 
+const MIDI_DEVICE_KEY = 'stage-control-midi-device';
+
 interface MIDIInput {
   id: string;
   name: string;
   manufacturer: string;
+}
+
+// Save selected MIDI device to localStorage
+function saveSelectedDevice(deviceId: string | null): void {
+  if (typeof window === 'undefined') return;
+  if (deviceId) {
+    localStorage.setItem(MIDI_DEVICE_KEY, deviceId);
+  } else {
+    localStorage.removeItem(MIDI_DEVICE_KEY);
+  }
+}
+
+// Get saved MIDI device from localStorage
+function getSavedDevice(): string | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(MIDI_DEVICE_KEY);
 }
 
 interface MIDIStoreState {
@@ -21,8 +39,8 @@ interface MIDIStoreState {
   isLearning: boolean;
   learningCallback: ((note: number, channel: number) => void) | null;
   
-  // Last received note (for display)
-  lastNote: { note: number; channel: number; velocity: number } | null;
+  // Last received note (for display) - includes eventId to detect repeated presses
+  lastNote: { note: number; channel: number; velocity: number; eventId: number } | null;
   
   // Error
   error: string | null;
@@ -40,6 +58,8 @@ interface MIDIStoreState {
   onNoteOn: ((note: number, channel: number, velocity: number) => void) | null;
   setNoteOnHandler: (handler: (note: number, channel: number, velocity: number) => void) => void;
 }
+
+let noteEventCounter = 0;
 
 export const useMIDIStore = create<MIDIStoreState>((set, get) => ({
   isSupported: typeof navigator !== 'undefined' && 'requestMIDIAccess' in navigator,
@@ -78,6 +98,12 @@ export const useMIDIStore = create<MIDIStoreState>((set, get) => ({
         error: null 
       });
       
+      // Try to reconnect to last used device
+      const savedDeviceId = getSavedDevice();
+      if (savedDeviceId && inputs.some(i => i.id === savedDeviceId)) {
+        get().selectInput(savedDeviceId);
+      }
+      
       // Listen for device changes
       midiAccess.onstatechange = () => {
         const newInputs: MIDIInput[] = [];
@@ -89,6 +115,13 @@ export const useMIDIStore = create<MIDIStoreState>((set, get) => ({
           });
         });
         set({ availableInputs: newInputs });
+        
+        // Try to reconnect to saved device if it becomes available
+        const { selectedInputId } = get();
+        const saved = getSavedDevice();
+        if (!selectedInputId && saved && newInputs.some(i => i.id === saved)) {
+          get().selectInput(saved);
+        }
       };
       
     } catch (error) {
@@ -127,7 +160,9 @@ export const useMIDIStore = create<MIDIStoreState>((set, get) => ({
         if (status >= 144 && status <= 159 && velocity > 0) {
           const channel = status - 144;
           
-          set({ lastNote: { note, channel, velocity } });
+          // Increment event counter to ensure each press is unique
+          noteEventCounter++;
+          set({ lastNote: { note, channel, velocity, eventId: noteEventCounter } });
           
           // If in learning mode, call the callback
           const { isLearning, learningCallback } = get();
@@ -145,6 +180,7 @@ export const useMIDIStore = create<MIDIStoreState>((set, get) => ({
       };
       
       set({ selectedInputId: inputId });
+      saveSelectedDevice(inputId);
     }
   },
   
@@ -159,6 +195,7 @@ export const useMIDIStore = create<MIDIStoreState>((set, get) => ({
     }
     
     set({ selectedInputId: null });
+    saveSelectedDevice(null);
   },
   
   startLearning: (callback) => {

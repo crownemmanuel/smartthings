@@ -24,7 +24,8 @@ import ConfirmModal from '@/components/modals/ConfirmModal';
 
 import type { 
   SceneWithGroups, 
-  DeviceGroupWithItems, 
+  DeviceGroupWithItems,
+  MIDIActionType, 
   SequenceWithSteps,
   DeviceGroupItem
 } from '@/types';
@@ -94,6 +95,7 @@ function StageControlApp({ onLogout }: { onLogout: () => void }) {
     addStepAction,
     removeStepAction,
     addMIDIMapping,
+    updateMIDIMapping,
     deleteMIDIMapping,
     getDeviceGroupById,
     getSequenceById,
@@ -421,6 +423,10 @@ function StageControlApp({ onLogout }: { onLogout: () => void }) {
     addMIDIMapping(midiNote, midiChannel, actionType, targetId);
   };
 
+  const handleUpdateMIDIMapping = (id: string, actionType: MIDIActionType, targetId: string | null) => {
+    updateMIDIMapping(id, { action_type: actionType, target_id: targetId });
+  };
+  
   const handleDeleteMIDIMapping = (mappingId: string) => {
     deleteMIDIMapping(mappingId);
   };
@@ -526,6 +532,7 @@ function StageControlApp({ onLogout }: { onLogout: () => void }) {
         <MIDISettings
           onClose={() => setShowMIDISettings(false)}
           onAddMapping={handleAddMIDIMapping}
+          onUpdateMapping={handleUpdateMIDIMapping}
           onDeleteMapping={handleDeleteMIDIMapping}
         />
       )}

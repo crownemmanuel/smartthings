@@ -1,19 +1,22 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useMIDIStore, midiNoteToName, getMIDIActionLabel } from '@/store/midiStore';
 import { useShowStore } from '@/store/showStore';
 import MIDILearnButton from './MIDILearnButton';
 import MIDIMappingList from './MIDIMappingList';
-import type { MIDIActionType } from '@/types';
+import MIDIEditModal from './MIDIEditModal';
+import type { MIDIActionType, MIDIMapping } from '@/types';
 
 interface MIDISettingsProps {
   onClose: () => void;
   onAddMapping: (midiNote: number, midiChannel: number, actionType: MIDIActionType, targetId: string | null) => void;
+  onUpdateMapping: (id: string, actionType: MIDIActionType, targetId: string | null) => void;
   onDeleteMapping: (mappingId: string) => void;
 }
 
-export default function MIDISettings({ onClose, onAddMapping, onDeleteMapping }: MIDISettingsProps) {
+export default function MIDISettings({ onClose, onAddMapping, onUpdateMapping, onDeleteMapping }: MIDISettingsProps) {
+  const [editingMapping, setEditingMapping] = useState<MIDIMapping | null>(null);
   const { 
     isSupported, 
     isConnected, 
@@ -129,8 +132,17 @@ export default function MIDISettings({ onClose, onAddMapping, onDeleteMapping }:
                   
                   <MIDIMappingList
                     mappings={currentShow.midi_mappings}
+                    onEdit={setEditingMapping}
                     onDelete={onDeleteMapping}
                   />
+                  
+                  {editingMapping && (
+                    <MIDIEditModal
+                      mapping={editingMapping}
+                      onSave={onUpdateMapping}
+                      onClose={() => setEditingMapping(null)}
+                    />
+                  )}
                 </div>
               )}
             </>
