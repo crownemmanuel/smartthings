@@ -2,7 +2,7 @@
 
 import { useShowStore } from '@/store/showStore';
 import { useDeviceStore } from '@/store/deviceStore';
-import { useMIDIStore, midiNoteToName } from '@/store/midiStore';
+import { useMIDIStore } from '@/store/midiStore';
 import type { Show } from '@/types';
 
 interface HeaderProps {
@@ -141,7 +141,7 @@ export default function Header({ shows, onShowChange, onNewShow, onOpenSettings,
           </span>
           {lastNote && (
             <span className="text-amber-500 font-mono text-xs">
-              {midiNoteToName(lastNote.note)}
+              Note {lastNote.note}
             </span>
           )}
         </div>

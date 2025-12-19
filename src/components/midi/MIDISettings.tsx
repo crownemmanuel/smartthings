@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useMIDIStore, midiNoteToName, getMIDIActionLabel } from '@/store/midiStore';
+import { useMIDIStore, getMIDIActionLabel } from '@/store/midiStore';
 import { useShowStore } from '@/store/showStore';
 import MIDILearnButton from './MIDILearnButton';
 import MIDIMappingList from './MIDIMappingList';
@@ -115,10 +115,10 @@ export default function MIDISettings({ onClose, onAddMapping, onUpdateMapping, o
                   {lastNote ? (
                     <div className="flex items-center gap-4">
                       <span className="text-2xl font-mono text-amber-500">
-                        {midiNoteToName(lastNote.note)}
+                        Note {lastNote.note}
                       </span>
                       <span className="text-zinc-500">
-                        Note {lastNote.note} • Channel {lastNote.channel + 1} • Velocity {lastNote.velocity}
+                        Channel {lastNote.channel + 1} • Velocity {lastNote.velocity}
                       </span>
                     </div>
                   ) : (

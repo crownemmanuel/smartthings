@@ -39,3 +39,4 @@ export function hasCredentials(): boolean {
   return getCredentials() !== null;
 }
 
+

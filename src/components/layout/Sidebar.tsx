@@ -131,3 +131,4 @@ export default function Sidebar({ onAddScene, onEditScene, onDeleteScene }: Side
   );
 }
 
+

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useMIDIStore, midiNoteToName, getMIDIActionLabel } from '@/store/midiStore';
+import { useMIDIStore } from '@/store/midiStore';
 import { useShowStore } from '@/store/showStore';
 import type { MIDIActionType } from '@/types';
 
@@ -107,7 +107,7 @@ export default function MIDILearnButton({ onLearn }: MIDILearnButtonProps) {
                 <div className="p-4 bg-emerald-900/30 border border-emerald-800 rounded-lg text-center">
                   <p className="text-sm text-emerald-400 mb-1">MIDI Note Captured</p>
                   <p className="text-2xl font-mono text-white">
-                    {midiNoteToName(learnedNote.note)} (Note {learnedNote.note})
+                    Note {learnedNote.note}
                   </p>
                   <p className="text-sm text-zinc-400 mt-1">Channel {learnedNote.channel + 1}</p>
                 </div>
@@ -175,4 +175,5 @@ export default function MIDILearnButton({ onLearn }: MIDILearnButtonProps) {
     </>
   );
 }
+
 

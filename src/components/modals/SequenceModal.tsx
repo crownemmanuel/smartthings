@@ -66,3 +66,4 @@ export default function SequenceModal({ onClose, onCreate }: SequenceModalProps)
   );
 }
 
+

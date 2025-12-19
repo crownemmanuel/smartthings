@@ -1,6 +1,6 @@
 'use client';
 
-import { midiNoteToName, getMIDIActionLabel } from '@/store/midiStore';
+import { getMIDIActionLabel } from '@/store/midiStore';
 import { useShowStore } from '@/store/showStore';
 import type { MIDIMapping } from '@/types';
 
@@ -60,9 +60,9 @@ export default function MIDIMappingList({ mappings, onEdit, onDelete }: MIDIMapp
           >
             <div className="flex items-center gap-4">
               {/* MIDI Note */}
-              <div className="w-16 text-center">
+              <div className="w-20 text-center">
                 <span className="text-lg font-mono text-amber-500">
-                  {midiNoteToName(mapping.midi_note)}
+                  Note {mapping.midi_note}
                 </span>
                 <p className="text-xs text-zinc-500">Ch {mapping.midi_channel + 1}</p>
               </div>

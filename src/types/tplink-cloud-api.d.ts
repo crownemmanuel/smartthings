@@ -39,3 +39,4 @@ declare module 'tplink-cloud-api' {
   export function login(email: string, password: string, termId?: string): Promise<TPLink>;
 }
 
+

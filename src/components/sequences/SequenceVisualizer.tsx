@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useShowStore } from '@/store/showStore';
-import { useMIDIStore, midiNoteToName } from '@/store/midiStore';
+import { useMIDIStore } from '@/store/midiStore';
 import type { SequenceWithSteps, TPLinkDevice, MIDIMapping } from '@/types';
 
 interface SequenceVisualizerProps {
@@ -134,7 +134,7 @@ export default function SequenceVisualizer({
   const handleMIDIAction = (mapping: MIDIMapping, note: number) => {
     setLastMidiTrigger({
       note,
-      noteName: midiNoteToName(note),
+      noteName: `Note ${note}`,
       action: mapping.action_type,
       timestamp: Date.now(),
     });

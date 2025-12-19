@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { midiNoteToName } from '@/store/midiStore';
 import { useShowStore } from '@/store/showStore';
 import type { MIDIMapping, MIDIActionType } from '@/types';
 
@@ -74,7 +73,7 @@ export default function MIDIEditModal({ mapping, onSave, onClose }: MIDIEditModa
         <div className="p-4 bg-zinc-900 border border-zinc-700 rounded-lg text-center mb-6">
           <p className="text-sm text-zinc-400 mb-1">MIDI Note</p>
           <p className="text-2xl font-mono text-amber-500">
-            {midiNoteToName(mapping.midi_note)} <span className="text-zinc-500">(Note {mapping.midi_note})</span>
+            Note {mapping.midi_note}
           </p>
           <p className="text-sm text-zinc-500 mt-1">Channel {mapping.midi_channel + 1}</p>
         </div>
@@ -136,4 +135,5 @@ export default function MIDIEditModal({ mapping, onSave, onClose }: MIDIEditModa
     </div>
   );
 }
+
 
