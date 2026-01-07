@@ -16,6 +16,7 @@ export default function Sidebar({ onAddScene, onEditScene, onDeleteScene }: Side
   
   const scenes = currentShow?.scenes || [];
   const isEditMode = mode === 'edit';
+  const hasCurrentShow = Boolean(currentShow);
   
   return (
     <aside className="w-72 bg-zinc-900 border-r border-zinc-800 flex flex-col h-full">
@@ -26,8 +27,9 @@ export default function Sidebar({ onAddScene, onEditScene, onDeleteScene }: Side
           {isEditMode && (
             <button
               onClick={onAddScene}
-              className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors"
-              title="Add Scene"
+              disabled={!hasCurrentShow}
+              className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-zinc-400"
+              title={hasCurrentShow ? "Add Scene" : "Create or select a show first"}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -41,8 +43,10 @@ export default function Sidebar({ onAddScene, onEditScene, onDeleteScene }: Side
       <div className="flex-1 overflow-y-auto p-3 space-y-2">
         {scenes.length === 0 ? (
           <div className="text-center py-8">
-            <p className="text-zinc-500 text-sm">No scenes yet</p>
-            {isEditMode && (
+            <p className="text-zinc-500 text-sm">
+              {hasCurrentShow ? 'No scenes yet' : 'Select or create a show first'}
+            </p>
+            {isEditMode && hasCurrentShow && (
               <button
                 onClick={onAddScene}
                 className="mt-3 text-sm text-amber-500 hover:text-amber-400"
@@ -130,5 +134,8 @@ export default function Sidebar({ onAddScene, onEditScene, onDeleteScene }: Side
     </aside>
   );
 }
+
+
+
 
 

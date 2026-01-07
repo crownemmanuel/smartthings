@@ -75,6 +75,7 @@ function StageControlApp({ onLogout }: { onLogout: () => void }) {
     loadShows,
     loadShow,
     createShow,
+    updateShow,
     deleteShow,
     setSelectedSceneId,
     addScene,
@@ -205,6 +206,10 @@ function StageControlApp({ onLogout }: { onLogout: () => void }) {
         setConfirmModal(null);
       },
     });
+  };
+
+  const handleEditShow = (showId: string, name: string) => {
+    updateShow(showId, { name });
   };
 
   // Scene handlers
@@ -440,6 +445,8 @@ function StageControlApp({ onLogout }: { onLogout: () => void }) {
         shows={shows}
         onShowChange={handleShowChange}
         onNewShow={() => setShowCreateShowModal(true)}
+        onEditShow={handleEditShow}
+        onDeleteShow={handleDeleteShow}
         onOpenSettings={() => setShowMIDISettings(true)}
         onOpenExportImport={() => setShowExportImport(true)}
         onLogout={onLogout}
@@ -454,6 +461,7 @@ function StageControlApp({ onLogout }: { onLogout: () => void }) {
         
         <MainPanel
           availableDevices={availableDevices}
+          onCreateShow={() => setShowCreateShowModal(true)}
           onAddDeviceGroup={handleAddDeviceGroup}
           onEditDeviceGroup={handleEditDeviceGroup}
           onDeleteDeviceGroup={handleDeleteDeviceGroup}

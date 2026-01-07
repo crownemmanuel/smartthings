@@ -5,12 +5,14 @@ import { useShowStore } from '@/store/showStore';
 import DeviceGroupList from '@/components/devices/DeviceGroupList';
 import DeviceTable from '@/components/devices/DeviceTable';
 import SequenceList from '@/components/sequences/SequenceList';
+import EmptyState from '@/components/layout/EmptyState';
 import type { TPLinkDevice, DeviceGroupWithItems, SequenceWithSteps } from '@/types';
 
 type MainTab = 'show' | 'devices';
 
 interface MainPanelProps {
   availableDevices: TPLinkDevice[];
+  onCreateShow: () => void;
   onAddDeviceGroup: () => void;
   onEditDeviceGroup: (group: DeviceGroupWithItems) => void;
   onDeleteDeviceGroup: (groupId: string) => void;
@@ -23,6 +25,7 @@ interface MainPanelProps {
 
 export default function MainPanel({
   availableDevices,
+  onCreateShow,
   onAddDeviceGroup,
   onEditDeviceGroup,
   onDeleteDeviceGroup,
@@ -99,17 +102,7 @@ export default function MainPanel({
             </div>
           </div>
         ) : (
-          <div className="flex-1 flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-zinc-900 flex items-center justify-center">
-                <svg className="w-8 h-8 text-zinc-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-              <h2 className="text-xl font-semibold text-white mb-2">No Show Selected</h2>
-              <p className="text-zinc-500">Select or create a show to get started</p>
-            </div>
-          </div>
+          <EmptyState onCreateShow={onCreateShow} />
         )}
       </main>
     );

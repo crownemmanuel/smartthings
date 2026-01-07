@@ -51,6 +51,7 @@ interface ShowState {
   loadShows: () => void;
   loadShow: (showId: string) => void;
   createShow: (name: string) => FullShow;
+  updateShow: (id: string, updates: Partial<Show>) => void;
   saveCurrentShow: () => void;
   deleteShow: (id: string) => void;
   importShow: (show: FullShow) => void;
@@ -163,6 +164,35 @@ export const useShowStore = create<ShowState>((set, get) => ({
     return show;
   },
   
+  updateShow: (id, updates) => {
+    const { currentShow } = get();
+    if (!currentShow || currentShow.id !== id) {
+      // Update in shows list only
+      const shows = getLocalShows();
+      const showIndex = shows.findIndex(s => s.id === id);
+      if (showIndex >= 0) {
+        shows[showIndex] = { ...shows[showIndex], ...updates };
+        // Update the full show in localStorage if it exists
+        const fullShow = getLocalShow(id);
+        if (fullShow) {
+          saveLocalShow({ ...fullShow, ...updates });
+        }
+        set({ shows });
+      }
+      return;
+    }
+    
+    // Update current show
+    const updatedShow = { ...currentShow, ...updates };
+    saveLocalShow(updatedShow);
+    
+    const shows = getLocalShows();
+    set({ 
+      shows,
+      currentShow: updatedShow
+    });
+  },
+  
   saveCurrentShow: () => {
     const { currentShow } = get();
     if (currentShow) {
@@ -229,8 +259,11 @@ export const useShowStore = create<ShowState>((set, get) => ({
   setSelectedSceneId: (id) => set({ selectedSceneId: id }),
   
   addScene: (name, color) => {
-    const { currentShow, saveCurrentShow } = get();
-    if (!currentShow) return;
+    const { currentShow } = get();
+    if (!currentShow) {
+      console.error('Cannot add scene: No show is currently loaded');
+      return;
+    }
     
     const newScene: SceneWithGroups = {
       id: generateId(),
@@ -242,15 +275,20 @@ export const useShowStore = create<ShowState>((set, get) => ({
       device_groups: [],
     };
     
+    const updatedShow = {
+      ...currentShow,
+      scenes: [...currentShow.scenes, newScene]
+    };
+    
     set({
-      currentShow: {
-        ...currentShow,
-        scenes: [...currentShow.scenes, newScene]
-      },
+      currentShow: updatedShow,
       selectedSceneId: newScene.id,
     });
     
-    saveCurrentShow();
+    // Save to localStorage - get fresh reference to ensure we save the updated state
+    saveLocalShow(updatedShow);
+    const shows = getLocalShows();
+    set({ shows });
   },
   
   updateScene: (id, updates) => {

@@ -1,33 +1,51 @@
 'use client';
 
+import { useState } from 'react';
 import { useShowStore } from '@/store/showStore';
 import { useDeviceStore } from '@/store/deviceStore';
 import { useMIDIStore } from '@/store/midiStore';
+import EditShowModal from '@/components/modals/EditShowModal';
 import type { Show } from '@/types';
 
 interface HeaderProps {
   shows: Show[];
   onShowChange: (showId: string) => void;
   onNewShow: () => void;
+  onEditShow: (showId: string, name: string) => void;
+  onDeleteShow: (showId: string) => void;
   onOpenSettings: () => void;
   onOpenExportImport: () => void;
   onLogout: () => void;
 }
 
-export default function Header({ shows, onShowChange, onNewShow, onOpenSettings, onOpenExportImport, onLogout }: HeaderProps) {
+export default function Header({ shows, onShowChange, onNewShow, onEditShow, onDeleteShow, onOpenSettings, onOpenExportImport, onLogout }: HeaderProps) {
   const { mode, setMode, currentShowId, currentShow } = useShowStore();
   const { blackout, controllingDevices, availableDevices, isLoadingDevices, deviceError, fetchDevices } = useDeviceStore();
   const { isConnected, lastNote, selectedInputId, availableInputs } = useMIDIStore();
+  const [showEditModal, setShowEditModal] = useState(false);
   
   const isBlackingOut = controllingDevices.size > 0;
   const selectedInput = availableInputs.find(i => i.id === selectedInputId);
   const deviceCount = availableDevices.length;
+  const currentShowName = currentShow?.name || '';
   
   const handleBlackout = async () => {
     try {
       await blackout();
     } catch (error) {
       console.error('Blackout failed:', error);
+    }
+  };
+  
+  const handleEditShow = (name: string) => {
+    if (currentShowId) {
+      onEditShow(currentShowId, name);
+    }
+  };
+  
+  const handleDeleteShow = () => {
+    if (currentShowId) {
+      onDeleteShow(currentShowId);
     }
   };
   
@@ -46,7 +64,7 @@ export default function Header({ shows, onShowChange, onNewShow, onOpenSettings,
         
         <div className="h-8 w-px bg-zinc-700" />
         
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <select
             value={currentShowId || ''}
             onChange={(e) => onShowChange(e.target.value)}
@@ -57,6 +75,29 @@ export default function Header({ shows, onShowChange, onNewShow, onOpenSettings,
               <option key={show.id} value={show.id}>{show.name}</option>
             ))}
           </select>
+          
+          {currentShowId && (
+            <>
+              <button
+                onClick={() => setShowEditModal(true)}
+                className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+                title="Edit Show Name"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+              <button
+                onClick={handleDeleteShow}
+                className="p-2 text-zinc-400 hover:text-red-400 hover:bg-zinc-800 rounded-lg transition-colors"
+                title="Delete Show"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+              </button>
+            </>
+          )}
           
           <button
             onClick={onNewShow}
@@ -193,6 +234,15 @@ export default function Header({ shows, onShowChange, onNewShow, onOpenSettings,
           {isBlackingOut ? 'BLACKING OUT...' : 'BLACKOUT'}
         </button>
       </div>
+      
+      {/* Edit Show Modal */}
+      {showEditModal && (
+        <EditShowModal
+          showName={currentShowName}
+          onClose={() => setShowEditModal(false)}
+          onSave={handleEditShow}
+        />
+      )}
     </header>
   );
 }

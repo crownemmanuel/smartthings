@@ -326,3 +326,6 @@ export default function DeviceTable({ devices }: DeviceTableProps) {
   );
 }
 
+
+
+
